@@ -1,0 +1,191 @@
+min_supp = float(input('Enter min_support: '))
+min_conf = float(input('Enter min_confidence: '))
+
+trx_qty = int(input('How many transactions: '))
+trxs = []
+k1 = 0
+while k1 < trx_qty:
+    str_input = str(input('Enter desired items:\n'
+                          '(separate items with space :)\n'))
+    trxs.append(str_input.split(' '))
+    k1 += 1
+
+# min_supp = 0.5
+# min_conf = 0.8
+# trxs = [['1', '3', '4'], ['2', '3', '5'], ['1', '2', '3', '5'], ['2', '5']]
+
+print('trxs: ', trxs)
+print()
+
+items = []
+items_qty = {}
+
+
+def extract_items(trx):
+    for i in trx:
+        for j in i:
+            items.append(j)
+    return items
+
+
+extract_items(trxs)
+
+
+def simple_count(item, item_k):
+    count = 0
+    for i in item:
+        if i == item_k:
+            count += 1
+    return count
+
+
+def first_count(item):
+    k = 0
+    while k <= len(item) - 1:
+        items_qty[item[k]] = simple_count(item, item[k])
+        k += 1
+    return items_qty
+
+
+print('first count: ', first_count(items))
+print()
+
+
+def prune_lower_supp(item_q):
+    for i in item_q.copy().keys():
+        if item_q[i] / len(trxs) < min_supp:
+            del item_q[i]
+    return item_q
+
+
+prune_lower_supp(items_qty)
+
+print('pruned_items_qty: ', items_qty)
+print()
+
+
+def frequent_items1():
+    items_frq1 = []
+    for i in items_qty.keys():
+        items_frq1.append(i)
+    return items_frq1
+
+
+def build_set(item):
+    d = []
+    for i in range(len(item)):
+        for j in range(i + 1, len(item)):
+            d.append({item[i], item[j]})
+    return d
+
+
+def func_trxs_set(item):
+    trxs_new = []
+    for i in item:
+        trxs_new.append(set(i))
+    return trxs_new
+
+
+trxs_set = func_trxs_set(trxs)
+tw_mem = build_set(frequent_items1())
+
+# print('trxs_new_set: ', trxs_set)
+# print()
+
+print('tw_mem is: ', tw_mem)
+print()
+
+
+def create_repeated_items_list(trx_set, tw_me):
+    c_list = []
+    for i in range(len(trx_set)):
+        for j in range(len(tw_me)):
+            if tw_me[j].issubset(trx_set[i]):
+                c_list.append(tw_me[j])
+    return c_list
+
+create_repeated_items_list(trxs_set, tw_mem)
+# print('c_list: ', create_repeated_items_list(trxs_set, tw_mem))
+# print()
+
+
+def sec_count(trx_set, tw_me):
+    k = 0
+    d = dict()
+    while k <= len(tw_me) - 1:
+        d[frozenset(tw_me[k])] = simple_count(create_repeated_items_list(trx_set, tw_me), tw_me[k])
+        k += 1
+    return d
+
+
+tw_mem_qty = sec_count(trxs_set, tw_mem)
+print('tw_mem_qty: ', tw_mem_qty)
+print()
+
+tw_mem_qty_pruned = prune_lower_supp(tw_mem_qty)
+print('tw_mem_qty_pruned: ', tw_mem_qty_pruned)
+print()
+
+
+def list_tw_mem_pruned(items):
+    l = []
+    for i in items.keys():
+        l.append(i)
+    return l
+
+
+def build_intersection_set(item):
+    thr_mem = set()
+    for i in range(len(item)):
+        p = item[i]
+        k = i
+        while k < len(item) - 1:
+            # print('p: ', p)
+            # print('k: ', k, item[k + 1])
+            if p.intersection(item[k + 1]):
+                thr_mem.add(frozenset(p).union(item[k + 1]))
+                # print('yes')
+            # else:
+            #     print('no')
+            k += 1
+    return thr_mem
+
+def ass_rules(one_pruned,tw_pruned,thr_pruned):
+    rules = dict()
+    for i in thr_pruned:
+        for j in one_pruned:
+           if set(j).issubset(i):
+               rules[j] = i - set(j)
+        for k in tw_pruned:
+            if k.issubset(i):
+                rules[k] = i - k
+    return rules
+
+def prune_lower_conf(thr_pruned,one_pruned,two_pruned):
+    result = rules.copy()
+    for i in thr_pruned.values():
+        for j in rules.keys():
+            if type(j) == str:
+                if i / one_pruned[j] < min_conf:
+                    result.pop(j)
+            else:
+                if i / two_pruned[j] < min_conf:
+                    result.pop(j)
+    return result
+
+if len(tw_mem_qty_pruned) > 1:
+    thr_mem = build_intersection_set(list_tw_mem_pruned(tw_mem_qty_pruned))
+    print('thr_mem: ', thr_mem)
+    print()
+    # print('c_list: ', create_repeated_items_list(trxs_set, list(thr_mem)))
+    thr_mem_qty = sec_count(trxs_set, list(thr_mem))
+    print('thr_mem_qty: ', thr_mem_qty)
+    print()
+    thr_mem_qty_pruned = prune_lower_supp(thr_mem_qty)
+    print('thr_mem_qty_pruned: ',thr_mem_qty_pruned)
+    print()
+    rules = ass_rules(items_qty,tw_mem_qty_pruned,thr_mem_qty_pruned)
+    print("Association rules are: ",rules)
+    print()
+    result = prune_lower_conf(thr_mem_qty_pruned,items_qty,tw_mem_qty_pruned)
+    print('extracted Association rules are: ',result)
